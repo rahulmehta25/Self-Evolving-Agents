@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TaskSpec v1",
+  "description": "Schema for benchmark task specifications",
+  "type": "object",
+  "required": ["task_id", "version", "category", "difficulty", "prompt_template", "gold_answer", "checker_type", "checker_config", "budget"],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Unique, immutable ID (e.g., 'tool_use_finance_001')"
+    },
+    "version": {
+      "type": "integer",
+      "description": "Increments on any change to prompt, gold, or checker"
+    },
+    "category": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["tool-use", "retrieval/citation", "code", "planning", "adversarial/injection"]
+      },
+      "minItems": 1,
+      "description": "Must include at least one from the taxonomy"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard"]
+    },
+    "prompt_template": {
+      "type": "string",
+      "description": "The base prompt to be given to the agent"
+    },
+    "context": {
+      "type": "string",
+      "description": "Optional: any initial context (e.g., a document for RAG)"
+    },
+    "input_params": {
+      "type": "object",
+      "description": "Optional: parameters to be injected into the prompt_template"
+    },
+    "gold_answer": {
+      "type": "object",
+      "description": "The ground truth data for evaluation. Structure depends on checker_type"
+    },
+    "checker_type": {
+      "type": "string",
+      "enum": ["regex", "json_schema", "python_unit", "llm_judge_only"]
+    },
+    "checker_config": {
+      "type": "object",
+      "description": "Configuration for the checker"
+    },
+    "budget": {
+      "type": "object",
+      "required": ["max_tokens", "max_tool_calls", "max_time_seconds"],
+      "properties": {
+        "max_tokens": {
+          "type": "integer"
+        },
+        "max_tool_calls": {
+          "type": "integer"
+        },
+        "max_time_seconds": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

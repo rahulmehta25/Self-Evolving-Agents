@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TraceEvent v1",
+  "description": "Schema for trace events logged during agent execution",
+  "type": "object",
+  "required": ["trace_id", "step_index", "timestamp", "event_type", "payload"],
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Foreign key to the runs table"
+    },
+    "step_index": {
+      "type": "integer",
+      "description": "Sequential index of the event within the run"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "Time elapsed since run start (for performance analysis)"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": ["MODEL_INPUT", "MODEL_OUTPUT", "TOOL_CALL", "TOOL_RESULT", "FINAL_ANSWER", "ERROR", "BUDGET_EXCEEDED", "TIMEOUT"],
+      "description": "Type of event"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Event-specific data (JSONB)"
+    },
+    "input_hash": {
+      "type": ["string", "null"],
+      "description": "SHA256 hash of the input content (e.g., the prompt)"
+    },
+    "output_hash": {
+      "type": ["string", "null"],
+      "description": "SHA256 hash of the output content (e.g., the LLM response)"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "GenomeSpec v1",
+  "description": "Schema for agent genome configurations (prompts, tool configs, hyperparams)",
+  "type": "object",
+  "required": ["genome_id", "system_prompt", "llm_config"],
+  "properties": {
+    "genome_id": {
+      "type": "string",
+      "description": "Unique identifier for the genome"
+    },
+    "parent_id": {
+      "type": ["string", "null"],
+      "description": "ID of parent genome (null for initial genomes)"
+    },
+    "generation": {
+      "type": "integer",
+      "description": "Evolutionary generation number"
+    },
+    "system_prompt": {
+      "type": "string",
+      "description": "System prompt for the agent"
+    },
+    "llm_config": {
+      "type": "object",
+      "required": ["model_name", "temperature"],
+      "properties": {
+        "model_name": {
+          "type": "string"
+        },
+        "model_version": {
+          "type": "string"
+        },
+        "temperature": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "top_p": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "max_tokens": {
+          "type": "integer"
+        }
+      }
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string"},
+          "description": {"type": "string"},
+          "parameters": {"type": "object"}
+        }
+      },
+      "description": "List of available tools for the agent"
+    },
+    "retrieval_config": {
+      "type": "object",
+      "properties": {
+        "top_k": {"type": "integer"},
+        "similarity_threshold": {"type": "number"}
+      }
+    },
+    "planner_type": {
+      "type": "string",
+      "enum": ["react", "cot", "planning", "none"]
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata for the genome"
+    }
+  }
+}
