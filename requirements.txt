@@ -1,0 +1,25 @@
+# EvoAgentBench Requirements
+# Core dependencies for v1.0
+
+# Data storage
+duckdb>=0.9.0  # Primary database (can fallback to sqlite3 which is built-in)
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# JSON schema validation
+jsonschema>=4.17.0
+
+# Utilities
+python-dateutil>=2.8.0
+
+# For future LLM integration (M3)
+# openai>=1.0.0
+# anthropic>=0.7.0
+
+# For statistical analysis (M2)
+scipy>=1.10.0
+
+# For YAML parsing (benchmark tasks)
+pyyaml>=6.0
