@@ -1,0 +1,23 @@
+task_id: tool_use_weather_003
+version: 2
+category:
+  - tool-use
+  - planning
+difficulty: medium
+prompt_template: "What is the weather like in {city} and what is the current time there? Use the provided tools."
+context: ""
+input_params:
+  city: "London, UK"
+gold_answer:
+  final_answer_regex: "The weather in London is (\\w+) and the time is (\\d{2}:\\d{2})"
+  required_tool_calls:
+    - "get_weather(London, UK)"
+    - "get_current_time(London, UK)"
+checker_type: regex
+checker_config:
+  pattern: "The weather in London is (\\w+) and the time is (\\d{2}:\\d{2})"
+  group: 0
+budget:
+  max_tokens: 1024
+  max_tool_calls: 5
+  max_time_seconds: 30

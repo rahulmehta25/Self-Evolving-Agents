@@ -1,0 +1,24 @@
+{
+  "task_id": "retrieval_policy_012",
+  "version": 1,
+  "category": ["retrieval/citation"],
+  "difficulty": "hard",
+  "prompt_template": "According to the provided document, what is the policy regarding remote work for new hires?",
+  "context": "The full text of the company's HR policy document (version 3.1) is provided as a tool-accessible knowledge base.",
+  "input_params": {},
+  "gold_answer": {
+    "expected_text_snippet": "New hires are eligible for remote work after a 90-day probationary period.",
+    "expected_source_id": "HR_Policy_v3.1",
+    "expected_source_span": [450, 520]
+  },
+  "checker_type": "python_unit",
+  "checker_config": {
+    "module": "checkers.citation",
+    "function": "check_citation_accuracy"
+  },
+  "budget": {
+    "max_tokens": 2048,
+    "max_tool_calls": 10,
+    "max_time_seconds": 60
+  }
+}
