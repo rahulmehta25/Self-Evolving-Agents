@@ -1,0 +1,21 @@
+task_id: tool_use_finance_001
+version: 1
+category:
+  - tool-use
+difficulty: medium
+prompt_template: "What is the current stock price of {symbol}? Use the stock_price_lookup tool."
+context: ""
+input_params:
+  symbol: "AAPL"
+gold_answer:
+  final_answer: "The current stock price of AAPL is"
+  required_tool_calls:
+    - "stock_price_lookup(symbol=AAPL)"
+checker_type: python_unit
+checker_config:
+  module: checkers.finance
+  function: check_finance_task
+budget:
+  max_tokens: 512
+  max_tool_calls: 3
+  max_time_seconds: 20
