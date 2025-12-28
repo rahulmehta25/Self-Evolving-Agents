@@ -1,0 +1,26 @@
+{
+  "task_id": "code_algorithm_001",
+  "version": 1,
+  "category": ["code"],
+  "difficulty": "hard",
+  "prompt_template": "Write a Python function to calculate the factorial of a number n.",
+  "context": "",
+  "input_params": {},
+  "gold_answer": {
+    "expected_function_name": "factorial",
+    "test_cases": [
+      {"input": 5, "expected_output": 120},
+      {"input": 0, "expected_output": 1}
+    ]
+  },
+  "checker_type": "python_unit",
+  "checker_config": {
+    "module": "checkers.code",
+    "function": "check_code_task"
+  },
+  "budget": {
+    "max_tokens": 2048,
+    "max_tool_calls": 0,
+    "max_time_seconds": 60
+  }
+}
