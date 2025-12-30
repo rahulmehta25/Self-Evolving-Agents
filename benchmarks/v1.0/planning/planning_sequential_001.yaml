@@ -1,0 +1,24 @@
+task_id: planning_sequential_001
+version: 1
+category:
+  - planning
+difficulty: medium
+prompt_template: "Plan a sequence of steps to {goal}. List the steps in order."
+context: ""
+input_params:
+  goal: "make a cup of coffee"
+gold_answer:
+  expected_steps:
+    - "get coffee beans"
+    - "grind beans"
+    - "boil water"
+    - "brew coffee"
+    - "pour coffee"
+checker_type: regex
+checker_config:
+  pattern: "(get|grind|boil|brew|pour)"
+  group: 0
+budget:
+  max_tokens: 1024
+  max_tool_calls: 0
+  max_time_seconds: 30
