@@ -5,7 +5,7 @@ Implements statistical methods for rigorous evaluation reporting.
 """
 
 import random
-from typing import Callable, List, Tuple
+from typing import Callable, Dict, List, Tuple
 
 import numpy as np
 from scipy import stats

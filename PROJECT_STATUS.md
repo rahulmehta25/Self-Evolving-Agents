@@ -1,23 +1,23 @@
 # EvoAgentBench Project Status
 
-**Last Updated:** January 23, 2026
+**Last Updated:** January 25, 2026
 
-## Overall Status: ✅ Core v1.0 Complete
+## Overall Status: ✅ Agentic with Vertex AI Gemini
 
-The EvoAgentBench platform has been fully implemented according to the technical implementation guide. All 5 milestones (M1-M5) are complete and the system is ready for LLM API integration.
+The **main agent loop uses the real Gemini API** (Vertex AI). When the Vertex SDK is installed and GCP is configured, `python -m evoagentbench --run` runs evolution with live Gemini calls by default. **Tools** (e.g. get_weather, retrieval) and the **LLM-as-Judge** (soft metrics) are still mocked; the evolved agent’s reasoning and final answers come from Gemini.
 
 ## Implementation Milestones
 
 ### ✅ M1: Data Foundation (Complete)
 - **DataStore**: SQLite backend with all required tables (genomes, tasks, runs, metrics, traces, ablations, generations)
 - **Schemas**: JSON schemas for TaskSpec, GenomeSpec, and TraceEvent
-- **AgentRunner**: Basic implementation with mocked LLM/tool integration
+- **AgentRunner**: **Vertex AI Gemini** for LLM calls (default when SDK present); tool execution still mocked
 - **TraceLogger**: Atomic event logging with input/output hashing
 - **BudgetTracker**: Budget enforcement (tokens, tool calls, time)
 
 ### ✅ M2: Evaluation Core (Complete)
 - **Evaluator**: Hard metrics (regex, json_schema, python_unit checkers)
-- **JudgeEvaluator**: LLM-as-Judge structure with calibration hooks
+- **JudgeEvaluator**: LLM-as-Judge structure; **judge calls are mocked** (fixed scores). Real judge LLM not wired.
 - **Statistics Module**: Bootstrap CI, permutation tests, significance testing
 - **Calibration Suite**: Judge drift detection framework
 
@@ -74,10 +74,60 @@ EvoAgentBench/
 - ✅ Perform ablation studies
 - ✅ Replay runs deterministically
 
+## What’s real vs mock
+
+| Component | Status | Notes |
+|-----------|--------|--------|
+| **Agent LLM** | ✅ **Real** | Vertex AI Gemini. Default when `google-cloud-aiplatform` + GCP/ADC are set. |
+| **Tools** | ✅ Real when configured | **Vertex AI Search** for retrieval/search when `EVOAGENTBENCH_VERTEX_SEARCH_DATA_STORE` is set. **Real API** for any tool when `EVOAGENTBENCH_TOOL_<NAME>_URL` is set; otherwise mock. |
+| **LLM-as-Judge** | ✅ Default Vertex | `EVOAGENTBENCH_JUDGE_LLM=vertex` is the default; use `--judge vertex` (default) or set env. Use `--judge mock` for placeholder scores. |
+| **Hard metrics** | ✅ Real | Regex, JSON schema, Python checkers (code, finance, citation) run on real agent output. |
+| **Evolution loop** | ✅ Real | Tournament selection, mutation, fitness from real Gemini outputs + hard metrics. |
+| **Artifact export** | ✅ Real | Local zip + optional GCS upload. |
+
+So: the system uses **real Vertex Gemini** for the agent and judge by default. **Tools** use Vertex Search and/or real URLs when configured (see `.env.example`).
+
+## Running and testing
+
+- **Quick evolution (real Gemini):**  
+  `python -m evoagentbench --run --db evoagentbench.db --benchmarks benchmarks/v1.0`  
+  Uses Vertex by default when GCP is configured. Use `--llm mock` for no API calls.
+- **Export artifact bundle:**  
+  `python -m evoagentbench --export-artifact <run_id> --db evoagentbench.db --out-dir ./artifacts`  
+  Optional: `--gcs-bucket BUCKET` or `EVOAGENTBENCH_GCS_BUCKET` to upload to GCS.
+- **Single genome vs tasks:** `EvoBenchOrchestrator.evaluate_genome(genome_id, task, run_seed)` after loading the suite.
+- **Baselines:** `scripts/run_baselines.py` (Zero-Shot and ReAct; “Previous Best” not wired in that script yet).
+- **Reports:** `scripts/generate_report.py`, `scripts/run_ablation.py`.
+
+---
+
+## Fundamentals & guide alignment
+
+| Area | Status |
+|------|--------|
+| Data store (runs, traces, tasks, genomes, metrics) | ✅ |
+| Task loading, `input_params` → prompt, all checker types | ✅ |
+| Run manifest (prompt_hashes, benchmark_suite_commit) | ✅ |
+| Citation checker + citation_fidelity (Guide §5.5) | ✅ |
+| Artifact bundle export (zip + optional GCS) | ✅ |
+| Evolution loop (tournament, mutation, elitism) | ✅ |
+| **Agent LLM (Vertex Gemini)** | ✅ real API |
+| NumPy RNG seeding (Guide §5.1) | ✅ |
+| Retries + EXTERNAL_FAILURE for Vertex (Guide §5.2) | ✅ |
+| Metric weights in EvolutionEngine config (Guide §5.6) | ✅ |
+| Designated holdout set (Guide §8.3) | ✅ |
+| Previous Best in run_baselines (Guide §5.9) | ✅ |
+| GenomeValidator + Evaluator.pre_run_check (Guide §9) | ✅ |
+| ReplayRunner, stats (bootstrap, permutation, win/tie/loss) | ✅ |
+
+Remaining gaps (see `docs/IMPLEMENTATION_GAPS.md`): thread-level time budget, real judge LLM, judge order randomization, win/tie/loss by task, ablation config file, dependency/tool hashes in manifest.
+
+---
+
 ## Next Steps (v2.0 / M3 Upgrade)
 
-1. **LLM API Integration**: Replace mocked LLM calls with actual API integration
-2. **Tool Execution**: Full tool execution framework
+1. **LLM API Integration**: Replace mocked LLM calls with actual API integration (required for testing real agents).
+2. **Tool Execution**: Full tool execution framework (real tools instead of mocks).
 3. **Docker Sandboxing**: Secure execution environment
 4. **Multi-Objective Optimization**: Pareto front selection
 5. **Safety Suite**: Comprehensive safety gating

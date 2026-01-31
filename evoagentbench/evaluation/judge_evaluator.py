@@ -2,11 +2,16 @@
 Judge Evaluator: LLM-as-Judge for computing soft metrics.
 
 Implements LLM-based evaluation with rubric, few-shot examples,
-calibration, and bias mitigation.
+calibration, and bias mitigation. Uses Vertex AI Gemini when
+EVOAGENTBENCH_JUDGE_LLM=vertex (same GCP credits as agent LLM).
+
+Guide §5.4: Order bias randomization for fair comparison.
 """
 
 import json
-from typing import Any, Dict, List, Optional
+import os
+import random
+from typing import Any, Dict, List, Optional, Tuple
 
 
 class JudgeEvaluator:
@@ -128,7 +133,10 @@ class JudgeEvaluator:
         if few_shot_examples:
             prompt_parts.append("")
             prompt_parts.append("FEW-SHOT EXAMPLES:")
-            for i, example in enumerate(few_shot_examples[:3], 1):  # Limit to 3 examples
+            # Guide §5.4: Randomize order of few-shot examples to prevent position bias
+            shuffled_examples = list(few_shot_examples[:3])
+            random.shuffle(shuffled_examples)
+            for i, example in enumerate(shuffled_examples, 1):
                 prompt_parts.append(f"\nExample {i}:")
                 prompt_parts.append(f"Output: {example['output']}")
                 prompt_parts.append(f"Scores: {json.dumps(example['scores'])}")
@@ -169,20 +177,42 @@ class JudgeEvaluator:
             task_description, agent_output, rubric, few_shot_examples
         )
         
-        # M2: Mock LLM call (will be replaced with actual API call in M3)
-        judge_response = self._mock_judge_call(judge_prompt)
-        
-        # Parse response
+        judge_response = self._judge_call(judge_prompt)
         scores = self._parse_judge_output(judge_response)
-        
         return scores
-    
+
+    def _judge_call(self, prompt: str) -> str:
+        """
+        Call judge LLM. Uses Vertex Gemini when EVOAGENTBENCH_JUDGE_LLM=vertex
+        or when unset and Vertex SDK is available (default production). Otherwise mock.
+        """
+        env_val = (os.environ.get("EVOAGENTBENCH_JUDGE_LLM") or "").strip().lower()
+        use_vertex = env_val == "vertex" or (env_val != "mock" and self._vertex_available())
+        if use_vertex:
+            try:
+                from evoagentbench.runner.llm_adapters import (
+                    _vertex_gemini_available,
+                    call_vertex_gemini_text_only,
+                )
+                if _vertex_gemini_available():
+                    model = str(self.judge_model_config.get("model_name") or "gemini-1.5-flash")
+                    if not model.startswith("gemini-"):
+                        model = "gemini-1.5-flash"
+                    temp = float(self.judge_model_config.get("temperature", 0.0))
+                    return call_vertex_gemini_text_only(prompt, model_id=model, temperature=temp)
+            except Exception:
+                pass
+        return self._mock_judge_call(prompt)
+
+    def _vertex_available(self) -> bool:
+        try:
+            from evoagentbench.runner.llm_adapters import _vertex_gemini_available
+            return _vertex_gemini_available()
+        except Exception:
+            return False
+
     def _mock_judge_call(self, prompt: str) -> str:
-        """
-        Mock judge LLM call for M2.
-        In M3, this will be replaced with actual LLM API calls.
-        """
-        # Simple mock that returns reasonable scores
+        """Fallback mock when Vertex is not used or call fails."""
         return json.dumps({
             "scores": {
                 "coherence_score": 4,
@@ -194,16 +224,20 @@ class JudgeEvaluator:
     
     def _parse_judge_output(self, judge_response: str) -> Dict[str, float]:
         """
-        Parse the judge's JSON response.
-        
-        Args:
-            judge_response: JSON string from judge LLM
-            
-        Returns:
-            Dictionary of scores
+        Parse the judge's JSON response (allows raw JSON or markdown-wrapped).
         """
+        raw = (judge_response or "").strip()
+        for start in ("```json", "```"):
+            if start in raw:
+                i = raw.find(start) + len(start)
+                j = raw.find("```", i)
+                if j != -1:
+                    raw = raw[i:j].strip()
+                else:
+                    raw = raw[i:].strip()
+                break
         try:
-            response_data = json.loads(judge_response)
+            response_data = json.loads(raw)
             scores = response_data.get("scores", {})
             
             # Normalize to float and ensure all expected dimensions are present
@@ -272,3 +306,41 @@ class JudgeEvaluator:
         # Approximate Kappa (simplified)
         kappa = (agreement_rate - 0.2) / 0.8  # Rough approximation
         return max(0.0, min(1.0, kappa))
+
+    def compare_outputs(
+        self,
+        task: Dict[str, Any],
+        output_a: str,
+        output_b: str,
+        seed: Optional[int] = None,
+    ) -> Tuple[Dict[str, float], Dict[str, float], bool]:
+        """
+        Compare two agent outputs with order randomization (Guide §5.4).
+
+        Args:
+            task: Task specification
+            output_a: First agent's output
+            output_b: Second agent's output
+            seed: Optional seed for reproducible randomization
+
+        Returns:
+            (scores_a, scores_b, was_swapped) - scores for each output and whether order was swapped
+        """
+        if seed is not None:
+            random.seed(seed)
+
+        # Randomize order to prevent position bias
+        swap = random.choice([True, False])
+        if swap:
+            first_output, second_output = output_b, output_a
+        else:
+            first_output, second_output = output_a, output_b
+
+        # Evaluate both outputs
+        scores_first = self.evaluate(task, first_output)
+        scores_second = self.evaluate(task, second_output)
+
+        # Map back to original order
+        if swap:
+            return scores_second, scores_first, True
+        return scores_first, scores_second, False

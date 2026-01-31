@@ -103,16 +103,26 @@ class ElitistSelection(SelectionStrategy):
         return elite
 
 
+_DEFAULT_METRIC_WEIGHTS = {
+    "pass_fail": 0.5,
+    "citation_fidelity": 0.3,
+    "coherence_score": 0.1,
+    "latency_seconds": -0.1,
+}
+
+
 class EvolutionEngine:
     """
     Evolution engine that manages the evolutionary loop.
+    Metric weights are part of the engine config (Guide §5.6).
     """
     
     def __init__(self, data_store: DataStore,
                  selection_strategy: Optional[SelectionStrategy] = None,
                  mutation_rate: float = 0.1,
                  crossover_rate: float = 0.2,
-                 elite_fraction: float = 0.05):
+                 elite_fraction: float = 0.05,
+                 metric_weights: Optional[Dict[str, float]] = None):
         """
         Initialize the evolution engine.
         
@@ -122,12 +132,14 @@ class EvolutionEngine:
             mutation_rate: Probability of mutation
             crossover_rate: Probability of crossover
             elite_fraction: Fraction of elite genomes to keep
+            metric_weights: Weights for weighted_fitness (Guide §5.6). Default from guide.
         """
         self.data_store = data_store
         self.selection_strategy = selection_strategy or TournamentSelection()
         self.elitist_selection = ElitistSelection(elite_fraction)
         self.mutator = GenomeMutator(mutation_rate)
         self.crossover_rate = crossover_rate
+        self.metric_weights = dict(metric_weights) if metric_weights else dict(_DEFAULT_METRIC_WEIGHTS)
     
     def evolve_generation(self, current_generation: int,
                          population_size: int,

@@ -78,6 +78,40 @@ results = orchestrator.run_evolution(
 python scripts/generate_report.py --db evoagentbench.db --output report.json
 ```
 
+## Using GCP (Vertex AI & Cloud Storage)
+
+### Vertex AI Gemini (real LLM)
+
+[Vertex AI Gemini](https://cloud.google.com/vertex-ai/generative-ai/docs) is the **default** when the Vertex SDK is installed and GCP is configured. No flag needed.
+
+1. **Auth**: `gcloud auth application-default login` and set your project (`gcloud config set project YOUR_PROJECT`).
+2. **Env** (optional): `EVOAGENTBENCH_GCP_PROJECT=your-project`, `EVOAGENTBENCH_GCP_LOCATION=us-central1`.
+3. **CLI**:  
+   `python -m evoagentbench --run`  
+   uses Vertex by default. To force mock (no API calls): `--llm mock`.  
+   In code: `EvoBenchOrchestrator(...)` uses Vertex when available; pass `llm_provider="mock"` to disable.
+
+Genome `llm_config.model_name` maps to Gemini (e.g. `gemini-1.5-flash`). The $300 GCP free trial applies when using Vertex AI.
+
+### Judge (LLM-as-Judge) with Vertex
+
+Use Vertex Gemini for soft metrics (coherence, completeness, correctness) instead of the mock:
+
+- **Env:** `EVOAGENTBENCH_JUDGE_LLM=vertex`
+- **CLI:** `python -m evoagentbench --run --judge vertex` (same ADC/project as agent)
+
+Judge stays mock by default so you only pay for agent calls until you opt in.
+
+### Cloud Storage (artifact bundles)
+
+Upload artifact bundles to a GCS bucket:
+
+1. **Create a bucket** in your project (e.g. `your-project-evoagentbench-artifacts`).
+2. **Env**: `EVOAGENTBENCH_GCS_BUCKET=your-bucket-name`
+3. **CLI**:  
+   `python -m evoagentbench --export-artifact RUN_ID --out-dir ./out --gcs-bucket your-bucket-name`  
+   The zip is written locally and to `gs://your-bucket-name/artifacts/artifact_bundle_*.zip`.
+
 ## Architecture
 
 The system consists of five main components:

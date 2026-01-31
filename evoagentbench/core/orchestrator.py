@@ -8,6 +8,7 @@ and coordinating evaluation and evolution cycles.
 import json
 import os
 import random
+import subprocess
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,7 @@ import yaml
 
 from .data_store import DataStore
 from .evolution_engine import EvolutionEngine
+from .genome_validator import validate_genome
 from ..evaluation.evaluator import Evaluator
 from ..evaluation.judge_evaluator import JudgeEvaluator
 from ..runner.agent_runner import AgentRunner
@@ -28,21 +30,43 @@ class EvoBenchOrchestrator:
     """
     
     def __init__(self, db_path: str = "evoagentbench.db",
-                 benchmark_path: str = "benchmarks/v1.0"):
+                 benchmark_path: str = "benchmarks/v1.0",
+                 llm_provider: Optional[str] = None):
         """
         Initialize the orchestrator.
         
         Args:
             db_path: Path to the database file
             benchmark_path: Path to the benchmark suite directory
+            llm_provider: "vertex" for Vertex AI Gemini, "mock" for mock.
+                Falls back to env EVOAGENTBENCH_LLM if None.
         """
         self.data_store = DataStore(db_path)
         self.benchmark_path = benchmark_path
         self.evolution_engine = EvolutionEngine(self.data_store)
-        self.agent_runner = AgentRunner(self.data_store)
+        self.agent_runner = AgentRunner(self.data_store, llm_provider=llm_provider)
         self.evaluator = Evaluator(self.data_store)
         self.judge_evaluator = JudgeEvaluator()
     
+    def _get_benchmark_suite_commit(self) -> Optional[str]:
+        """Return git commit (or tag) for the benchmark suite dir (Guide §4.5)."""
+        p = Path(self.benchmark_path).resolve()
+        if not p.exists():
+            return None
+        try:
+            out = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=str(p),
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if out.returncode == 0 and out.stdout:
+                return out.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+            pass
+        return None
+
     def load_benchmark_suite(self) -> List[Dict[str, Any]]:
         """
         Load all tasks from the benchmark suite.
@@ -54,7 +78,7 @@ class EvoBenchOrchestrator:
         benchmark_dir = Path(self.benchmark_path)
         
         if not benchmark_dir.exists():
-            raise ValueError(f"Benchmark directory not found: {benchmark_path}")
+            raise ValueError(f"Benchmark directory not found: {self.benchmark_path}")
         
         # Load all YAML and JSON files
         for task_file in benchmark_dir.rglob("*.yaml"):
@@ -88,9 +112,11 @@ class EvoBenchOrchestrator:
             genome["generation"] = generation
             if "genome_id" not in genome:
                 genome["genome_id"] = str(uuid.uuid4())
+            ok, err = validate_genome(genome)
+            if not ok:
+                raise ValueError(f"Invalid genome: {err}")
             genome_id = self.data_store.save_genome(genome)
             genome_ids.append(genome_id)
-        
         return genome_ids
     
     def evaluate_genome(self, genome_id: str, task: Dict[str, Any],
@@ -107,13 +133,21 @@ class EvoBenchOrchestrator:
         Returns:
             Evaluation results
         """
-        # Get genome
         genome = self.data_store.get_genome(genome_id)
         if not genome:
             raise ValueError(f"Genome {genome_id} not found")
-        
+
+        ok, err = self.evaluator.pre_run_check(task, genome)
+        if not ok:
+            raise ValueError(f"pre_run_check failed: {err}")
+
+        benchmark_suite_commit = self._get_benchmark_suite_commit()
+
         # Run agent
-        run_result = self.agent_runner.run_task(genome, task, run_seed, generation_id)
+        run_result = self.agent_runner.run_task(
+            genome, task, run_seed, generation_id,
+            benchmark_suite_commit=benchmark_suite_commit,
+        )
         run_id = run_result["run_id"]
         
         # Evaluate hard metrics
@@ -130,8 +164,9 @@ class EvoBenchOrchestrator:
         # Combine metrics
         all_metrics = {**hard_metrics, **soft_metrics}
         
-        # Compute weighted fitness
-        weighted_fitness = self.evaluator.compute_weighted_fitness(all_metrics)
+        # Compute weighted fitness (weights from evolution engine config, Guide §5.6)
+        weights = getattr(self.evolution_engine, "metric_weights", None)
+        weighted_fitness = self.evaluator.compute_weighted_fitness(all_metrics, weights=weights)
         all_metrics["weighted_fitness"] = weighted_fitness
         
         # Save metrics
@@ -167,11 +202,11 @@ class EvoBenchOrchestrator:
         if not genomes:
             raise ValueError(f"No genomes found for generation {generation}")
         
-        # Split tasks into main and holdout
-        random.shuffle(tasks)
-        split_idx = int(len(tasks) * (1 - holdout_fraction))
-        main_tasks = tasks[:split_idx]
-        holdout_tasks = tasks[split_idx:]
+        # Split tasks into main and holdout (Guide §8.3: designated holdout, deterministic)
+        sorted_tasks = sorted(tasks, key=lambda t: (str(t.get("task_id", "")), int(t.get("version", 0))))
+        split_idx = int(len(sorted_tasks) * (1 - holdout_fraction))
+        main_tasks = sorted_tasks[:split_idx]
+        holdout_tasks = sorted_tasks[split_idx:]
         
         # Record generation start
         start_time = datetime.utcnow()
@@ -200,7 +235,12 @@ class EvoBenchOrchestrator:
         # Update generation record
         end_time = datetime.utcnow()
         self.data_store.save_generation(
-            generation, start_time, best_genome_id, avg_fitness, len(genomes)
+            generation,
+            start_time,
+            end_time=end_time,
+            best_genome_id=best_genome_id,
+            avg_fitness=avg_fitness,
+            population_size=len(genomes)
         )
         
         return {

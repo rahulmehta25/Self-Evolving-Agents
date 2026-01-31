@@ -9,7 +9,8 @@ import importlib
 import json
 import re
 import time
-from typing import Any, Dict, List, Optional
+from numbers import Real
+from typing import Any, Dict, List, Optional, Tuple
 
 from jsonschema import validate, ValidationError
 
@@ -27,6 +28,33 @@ class Evaluator:
             data_store: DataStore instance for retrieving traces
         """
         self.data_store = data_store
+    
+    def pre_run_check(self, task: Dict[str, Any], genome: Dict[str, Any],
+                      budget: Optional[Dict[str, Any]] = None) -> Tuple[bool, Optional[str]]:
+        """
+        Check that task, genome, and budget are valid before a run (Guide §9).
+        v1: validates budget and required fields; v2 extension point for safety checks.
+        
+        Args:
+            task: Task specification
+            genome: Genome configuration
+            budget: Optional budget dict (defaults to task.get("budget"))
+            
+        Returns:
+            (ok: bool, error_message: Optional[str])
+        """
+        budget = budget or task.get("budget") or {}
+        for key in ("max_tokens", "max_tool_calls", "max_time_seconds"):
+            v = budget.get(key)
+            if v is not None and (not isinstance(v, (int, float)) or v < 0):
+                return False, f"budget.{key} must be a non-negative number"
+        if not task.get("task_id"):
+            return False, "task missing task_id"
+        if not task.get("checker_type"):
+            return False, "task missing checker_type"
+        if not isinstance(genome.get("llm_config"), dict):
+            return False, "genome missing or invalid llm_config"
+        return True, None
     
     def evaluate(self, run_id: str, task: Dict[str, Any], 
                 run_result: Dict[str, Any]) -> Dict[str, float]:
@@ -87,8 +115,18 @@ class Evaluator:
         else:
             # Unknown checker type
             metrics["pass_fail"] = 0.0
-        
-        return metrics
+
+        return self._filter_numeric_metrics(metrics)
+
+    def _filter_numeric_metrics(self, metrics: Dict[str, Any]) -> Dict[str, float]:
+        """Filter metrics to numeric values only."""
+        numeric_metrics: Dict[str, float] = {}
+        for name, value in metrics.items():
+            if isinstance(value, bool):
+                numeric_metrics[name] = 1.0 if value else 0.0
+            elif isinstance(value, Real):
+                numeric_metrics[name] = float(value)
+        return numeric_metrics
     
     def _evaluate_regex(self, final_answer: str, task: Dict[str, Any]) -> Dict[str, float]:
         """
@@ -227,6 +265,8 @@ class Evaluator:
         
         fitness = 0.0
         for metric_name, metric_value in metrics.items():
+            if not isinstance(metric_value, Real):
+                continue
             weight = weights.get(metric_name, 0.0)
             fitness += weight * metric_value
         

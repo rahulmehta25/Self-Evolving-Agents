@@ -428,6 +428,7 @@ class DataStore:
     # ========== Generation Operations ==========
     
     def save_generation(self, generation_id: int, start_time: datetime,
+                       end_time: Optional[datetime] = None,
                        best_genome_id: Optional[str] = None,
                        avg_fitness: Optional[float] = None,
                        population_size: Optional[int] = None):
@@ -435,9 +436,16 @@ class DataStore:
         cursor = self.conn.cursor()
         cursor.execute("""
             INSERT OR REPLACE INTO generations 
-            (generation_id, start_time, best_genome_id, avg_fitness, population_size)
-            VALUES (?, ?, ?, ?, ?)
-        """, (generation_id, start_time.isoformat(), best_genome_id, avg_fitness, population_size))
+            (generation_id, start_time, end_time, best_genome_id, avg_fitness, population_size)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            generation_id,
+            start_time.isoformat(),
+            end_time.isoformat() if end_time else None,
+            best_genome_id,
+            avg_fitness,
+            population_size
+        ))
         self.conn.commit()
     
     def close(self):
