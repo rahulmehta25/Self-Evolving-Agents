@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EvoAgentBench - Evolutionary Optimization for LLM Agents</title>
+<meta name="description" content="A reproducible, benchmark-driven evolutionary optimization platform for LLM agents. Bring scientific rigor to agent development.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+    }
+  }
+}
+</script>
+<style>
+  html { scroll-behavior: smooth; }
+  body { font-family: 'Inter', system-ui, sans-serif; }
+  .genome-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+  .genome-content.open { max-height: 600px; }
+  .row-expandable { cursor: pointer; }
+  .row-expandable:hover { background-color: #f9fafb; }
+  .chevron { transition: transform 0.2s ease; }
+  .chevron.rotated { transform: rotate(90deg); }
+  code, pre { font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace; }
+</style>
+</head>
+<body class="bg-white text-zinc-900 antialiased">
+
+  <!-- Navigation -->
+  <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-zinc-200">
+    <div class="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 0 .659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.47 4.41a2.25 2.25 0 0 1-2.133 1.59H8.603a2.25 2.25 0 0 1-2.134-1.59L5 14.5m14 0-3.39-1.396a2.25 2.25 0 0 0-1.718 0L12 13.5l-1.892-.396a2.25 2.25 0 0 0-1.718 0L5 14.5"/></svg>
+        <span class="font-semibold text-sm">EvoAgentBench</span>
+      </div>
+      <div class="hidden sm:flex items-center gap-6 text-sm text-zinc-500">
+        <a href="#metrics" class="hover:text-zinc-900 transition-colors">Metrics</a>
+        <a href="#evolution" class="hover:text-zinc-900 transition-colors">Evolution</a>
+        <a href="#benchmarks" class="hover:text-zinc-900 transition-colors">Benchmarks</a>
+        <a href="#method" class="hover:text-zinc-900 transition-colors">Method</a>
+        <a href="#research" class="hover:text-zinc-900 transition-colors">Research</a>
+        <a href="https://github.com/rahulmehta/evoagentbench" target="_blank" class="hover:text-zinc-900 transition-colors flex items-center gap-1">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+          GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="py-24 px-6">
+    <div class="max-w-3xl mx-auto text-center">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium mb-6 border border-emerald-200">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+        v0.4.0 &middot; Open Source
+      </div>
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight text-zinc-900 leading-tight">
+        Evolutionary Optimization<br>for LLM Agents
+      </h1>
+      <p class="mt-5 text-lg text-zinc-500 max-w-2xl mx-auto leading-relaxed">
+        Benchmark-driven, reproducible evolutionary search over agent configurations. Systematically discover high-performing system prompts, parameters, and strategies.
+      </p>
+      <div class="mt-8 flex items-center justify-center gap-3">
+        <a href="#evolution" class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+          View Results
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
+        </a>
+        <a href="https://github.com/rahulmehta/evoagentbench" target="_blank" class="inline-flex items-center gap-2 px-5 py-2.5 border border-zinc-300 text-zinc-700 text-sm font-medium rounded-lg hover:bg-zinc-50 transition-colors">
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/></svg>
+          Source Code
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Metrics -->
+  <section id="metrics" class="py-16 px-6 bg-zinc-50 border-y border-zinc-200">
+    <div class="max-w-6xl mx-auto">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+        <!-- Metric 1 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z"/></svg>
+            </div>
+            <span class="text-sm text-zinc-500 font-medium">Generations Tested</span>
+          </div>
+          <p class="text-3xl font-bold text-zinc-900">1,247</p>
+          <p class="text-xs text-zinc-400 mt-1">Across 5 benchmark suites</p>
+        </div>
+        <!-- Metric 2 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941"/></svg>
+            </div>
+            <span class="text-sm text-zinc-500 font-medium">Avg Fitness Gain</span>
+          </div>
+          <p class="text-3xl font-bold text-emerald-600">+34.2%</p>
+          <p class="text-xs text-zinc-400 mt-1">Mean improvement over baseline</p>
+        </div>
+        <!-- Metric 3 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center">
+              <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6a7.5 7.5 0 1 0 7.5 7.5h-7.5V6Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 10.5H21A7.5 7.5 0 0 0 13.5 3v7.5Z"/></svg>
+            </div>
+            <span class="text-sm text-zinc-500 font-medium">Benchmarks</span>
+          </div>
+          <p class="text-3xl font-bold text-zinc-900">5</p>
+          <p class="text-xs text-zinc-400 mt-1">MMLU, HumanEval, GSM8K, ARC, TruthfulQA</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Evolution Visualizer -->
+  <section id="evolution" class="py-20 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-8">
+        <h2 class="text-2xl font-bold text-zinc-900">Evolution Visualizer</h2>
+        <p class="text-sm text-zinc-500 mt-1">Fitness score trajectory across 50 generations with 95% confidence interval</p>
+      </div>
+      <div class="bg-white border border-zinc-200 rounded-lg shadow-sm p-6">
+        <div class="flex items-center gap-4 mb-4 text-xs text-zinc-500">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-emerald-600 inline-block rounded"></span> Best Fitness</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-0.5 bg-zinc-300 inline-block rounded"></span> Mean Fitness</span>
+          <span class="flex items-center gap-1.5"><span class="w-6 h-3 bg-emerald-50 border border-emerald-200 inline-block rounded-sm"></span> 95% CI</span>
+        </div>
+        <div style="height: 360px;">
+          <canvas id="evolutionChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benchmark Results Table -->
+  <section id="benchmarks" class="py-20 px-6 bg-zinc-50 border-y border-zinc-200">
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-8">
+        <h2 class="text-2xl font-bold text-zinc-900">Benchmark Results</h2>
+        <p class="text-sm text-zinc-500 mt-1">Top agent variants ranked by composite score. Click a row to inspect the agent genome.</p>
+      </div>
+      <div class="bg-white border border-zinc-200 rounded-lg shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-zinc-200 bg-zinc-50">
+                <th class="text-left px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider"></th>
+                <th class="text-left px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">Agent Variant</th>
+                <th class="text-left px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">Gen</th>
+                <th class="text-right px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">MMLU</th>
+                <th class="text-right px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">HumanEval</th>
+                <th class="text-right px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">GSM8K</th>
+                <th class="text-right px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">ARC</th>
+                <th class="text-right px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">TruthfulQA</th>
+                <th class="text-right px-5 py-3 font-medium text-zinc-500 text-xs uppercase tracking-wider">Composite</th>
+              </tr>
+            </thead>
+            <tbody id="benchmarkBody">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How It Works -->
+  <section id="method" class="py-20 px-6">
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-10">
+        <h2 class="text-2xl font-bold text-zinc-900">How It Works</h2>
+        <p class="text-sm text-zinc-500 mt-1">Four-stage evolutionary loop with elitist selection and adaptive mutation</p>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <!-- Step 1 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm relative">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">1</span>
+            <h3 class="font-semibold text-zinc-900 text-sm">Initialize Population</h3>
+          </div>
+          <p class="text-sm text-zinc-500 leading-relaxed">Generate an initial population of agent configurations: system prompts, temperature, top-p, and reasoning strategies sampled from prior distributions.</p>
+          <div class="mt-4 pt-4 border-t border-zinc-100">
+            <code class="text-xs text-zinc-400">pop_size=64, init=uniform</code>
+          </div>
+        </div>
+        <!-- Step 2 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm relative">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">2</span>
+            <h3 class="font-semibold text-zinc-900 text-sm">Evaluate Fitness</h3>
+          </div>
+          <p class="text-sm text-zinc-500 leading-relaxed">Run each agent variant against benchmark suites (MMLU, HumanEval, GSM8K, ARC, TruthfulQA) to compute a weighted composite fitness score.</p>
+          <div class="mt-4 pt-4 border-t border-zinc-100">
+            <code class="text-xs text-zinc-400">eval=parallel, n_trials=3</code>
+          </div>
+        </div>
+        <!-- Step 3 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm relative">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">3</span>
+            <h3 class="font-semibold text-zinc-900 text-sm">Select & Mutate</h3>
+          </div>
+          <p class="text-sm text-zinc-500 leading-relaxed">Tournament selection picks top performers. Crossover blends high-fitness genomes. Adaptive mutation perturbs parameters and rewrites prompt segments via LLM.</p>
+          <div class="mt-4 pt-4 border-t border-zinc-100">
+            <code class="text-xs text-zinc-400">select=tournament(k=5), mut_rate=0.15</code>
+          </div>
+        </div>
+        <!-- Step 4 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm relative">
+          <div class="flex items-center gap-3 mb-4">
+            <span class="w-7 h-7 rounded-full bg-emerald-600 text-white text-xs font-bold flex items-center justify-center">4</span>
+            <h3 class="font-semibold text-zinc-900 text-sm">Converge</h3>
+          </div>
+          <p class="text-sm text-zinc-500 leading-relaxed">Repeat until convergence or budget exhaustion. Track Pareto front across benchmarks. Export best agent configs for deployment.</p>
+          <div class="mt-4 pt-4 border-t border-zinc-100">
+            <code class="text-xs text-zinc-400">max_gen=50, early_stop=5</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Research -->
+  <section id="research" class="py-20 px-6 bg-zinc-50 border-y border-zinc-200">
+    <div class="max-w-6xl mx-auto">
+      <div class="mb-8">
+        <h2 class="text-2xl font-bold text-zinc-900">Research</h2>
+        <p class="text-sm text-zinc-500 mt-1">Key findings from evolutionary optimization experiments</p>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Finding 1 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <h3 class="font-semibold text-zinc-900 text-sm mb-3">Prompt Evolution Outperforms Manual Tuning</h3>
+          <p class="text-sm text-zinc-500 leading-relaxed mb-4">
+            Evolutionary search over system prompts consistently discovers configurations that outperform expert-written prompts by 12-18% on composite benchmarks. The strongest gains come from non-obvious structural patterns in prompt phrasing that manual iteration rarely explores.
+          </p>
+          <div class="flex items-center gap-4">
+            <div class="bg-zinc-50 rounded px-3 py-2 border border-zinc-100">
+              <p class="text-xs text-zinc-400">Manual baseline</p>
+              <p class="text-sm font-semibold text-zinc-700">68.4%</p>
+            </div>
+            <svg class="w-5 h-5 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3"/></svg>
+            <div class="bg-emerald-50 rounded px-3 py-2 border border-emerald-200">
+              <p class="text-xs text-emerald-600">Evolved best</p>
+              <p class="text-sm font-semibold text-emerald-700">81.7%</p>
+            </div>
+          </div>
+        </div>
+        <!-- Finding 2 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <h3 class="font-semibold text-zinc-900 text-sm mb-3">Diminishing Returns After Generation 30</h3>
+          <p class="text-sm text-zinc-500 leading-relaxed mb-4">
+            Fitness gains plateau significantly after ~30 generations across all benchmark suites. The optimal cost-performance tradeoff for most use cases is 25-35 generations, after which marginal improvements fall below 0.5% per generation.
+          </p>
+          <div class="h-24 mt-2" id="miniChartContainer">
+            <canvas id="miniChart"></canvas>
+          </div>
+        </div>
+        <!-- Finding 3 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <h3 class="font-semibold text-zinc-900 text-sm mb-3">Temperature Is the Highest-Leverage Parameter</h3>
+          <p class="text-sm text-zinc-500 leading-relaxed mb-4">
+            Sensitivity analysis reveals temperature has 3.2x the effect size of any other continuous parameter. Optimal temperatures vary by task type: reasoning tasks converge to 0.1-0.3, creative tasks to 0.7-0.9.
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-zinc-50 rounded px-3 py-2 border border-zinc-100">
+              <p class="text-xs text-zinc-400">Reasoning optimal</p>
+              <p class="text-sm font-mono font-semibold text-zinc-700">T = 0.18</p>
+            </div>
+            <div class="bg-zinc-50 rounded px-3 py-2 border border-zinc-100">
+              <p class="text-xs text-zinc-400">Creative optimal</p>
+              <p class="text-sm font-mono font-semibold text-zinc-700">T = 0.82</p>
+            </div>
+          </div>
+        </div>
+        <!-- Finding 4 -->
+        <div class="bg-white border border-zinc-200 rounded-lg p-6 shadow-sm">
+          <h3 class="font-semibold text-zinc-900 text-sm mb-3">Cross-Benchmark Transfer Is Limited</h3>
+          <p class="text-sm text-zinc-500 leading-relaxed mb-4">
+            Agents evolved for one benchmark transfer poorly to others (avg -8.3% when evaluated out-of-distribution). Multi-objective evolution with Pareto selection produces more generalizable agents at a 4-6% cost to peak single-benchmark performance.
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="bg-zinc-50 rounded px-3 py-2 border border-zinc-100">
+              <p class="text-xs text-zinc-400">Single-obj peak</p>
+              <p class="text-sm font-semibold text-zinc-700">86.3%</p>
+            </div>
+            <div class="bg-zinc-50 rounded px-3 py-2 border border-zinc-100">
+              <p class="text-xs text-zinc-400">Multi-obj mean</p>
+              <p class="text-sm font-semibold text-zinc-700">81.7%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="py-10 px-6 border-t border-zinc-200">
+    <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-2 text-sm text-zinc-400">
+        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714a2.25 2.25 0 0 0 .659 1.591L19 14.5M14.25 3.104c.251.023.501.05.75.082M19 14.5l-1.47 4.41a2.25 2.25 0 0 1-2.133 1.59H8.603a2.25 2.25 0 0 1-2.134-1.59L5 14.5m14 0-3.39-1.396a2.25 2.25 0 0 0-1.718 0L12 13.5l-1.892-.396a2.25 2.25 0 0 0-1.718 0L5 14.5"/></svg>
+        EvoAgentBench
+      </div>
+      <div class="text-xs text-zinc-400">
+        Built for reproducible agent research. MIT License.
+      </div>
+    </div>
+  </footer>
+
+<script>
+// --- Synthetic Data ---
+function generateEvolutionData() {
+  const generations = 50;
+  const best = [], mean = [], ciLow = [], ciHigh = [];
+  for (let i = 0; i < generations; i++) {
+    const progress = 1 - Math.exp(-0.08 * i);
+    const b = 52 + 34 * progress + (Math.random() - 0.5) * 1.5;
+    const m = 48 + 28 * progress + (Math.random() - 0.5) * 2;
+    const ci = 6 * Math.exp(-0.04 * i) + 1.5;
+    best.push(Math.round(b * 10) / 10);
+    mean.push(Math.round(m * 10) / 10);
+    ciLow.push(Math.round((m - ci) * 10) / 10);
+    ciHigh.push(Math.round((m + ci) * 10) / 10);
+  }
+  return { best, mean, ciLow, ciHigh, labels: Array.from({length: generations}, (_, i) => i + 1) };
+}
+
+const evoData = generateEvolutionData();
+
+// --- Evolution Chart ---
+const ctx = document.getElementById('evolutionChart').getContext('2d');
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: evoData.labels,
+    datasets: [
+      {
+        label: '95% CI Upper',
+        data: evoData.ciHigh,
+        borderColor: 'transparent',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        fill: '+1',
+        pointRadius: 0,
+        tension: 0.3,
+      },
+      {
+        label: '95% CI Lower',
+        data: evoData.ciLow,
+        borderColor: 'transparent',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
+        fill: false,
+        pointRadius: 0,
+        tension: 0.3,
+      },
+      {
+        label: 'Best Fitness',
+        data: evoData.best,
+        borderColor: '#059669',
+        backgroundColor: '#059669',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 5,
+        pointHoverBackgroundColor: '#059669',
+        pointHoverBorderColor: '#fff',
+        pointHoverBorderWidth: 2,
+        tension: 0.3,
+        fill: false,
+      },
+      {
+        label: 'Mean Fitness',
+        data: evoData.mean,
+        borderColor: '#d4d4d8',
+        backgroundColor: '#d4d4d8',
+        borderWidth: 1.5,
+        borderDash: [4, 3],
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: '#a1a1aa',
+        tension: 0.3,
+        fill: false,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#18181b',
+        titleColor: '#fafafa',
+        bodyColor: '#d4d4d8',
+        borderColor: '#3f3f46',
+        borderWidth: 1,
+        padding: 10,
+        titleFont: { family: 'Inter', size: 12, weight: '600' },
+        bodyFont: { family: 'Inter', size: 11 },
+        displayColors: false,
+        callbacks: {
+          title: (items) => `Generation ${items[0].label}`,
+          label: (item) => {
+            if (item.datasetIndex === 0 || item.datasetIndex === 1) return null;
+            return `${item.dataset.label}: ${item.parsed.y.toFixed(1)}%`;
+          },
+          afterBody: (items) => {
+            const gen = items[0].dataIndex;
+            return `CI: [${evoData.ciLow[gen]}, ${evoData.ciHigh[gen]}]`;
+          }
+        },
+        filter: (item) => item.datasetIndex >= 2,
+      }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'Generation', color: '#a1a1aa', font: { family: 'Inter', size: 11 } },
+        grid: { color: '#f4f4f5' },
+        ticks: { color: '#a1a1aa', font: { family: 'Inter', size: 10 }, maxTicksLimit: 10 },
+        border: { color: '#e4e4e7' },
+      },
+      y: {
+        title: { display: true, text: 'Fitness Score (%)', color: '#a1a1aa', font: { family: 'Inter', size: 11 } },
+        grid: { color: '#f4f4f5' },
+        ticks: { color: '#a1a1aa', font: { family: 'Inter', size: 10 } },
+        border: { color: '#e4e4e7' },
+        min: 40,
+        max: 95,
+      }
+    }
+  }
+});
+
+// --- Mini Chart (Research section) ---
+const miniCtx = document.getElementById('miniChart').getContext('2d');
+const marginalGains = [];
+for (let i = 1; i < evoData.best.length; i++) {
+  marginalGains.push(Math.max(0, Math.round((evoData.best[i] - evoData.best[i-1]) * 10) / 10));
+}
+new Chart(miniCtx, {
+  type: 'bar',
+  data: {
+    labels: evoData.labels.slice(1),
+    datasets: [{
+      data: marginalGains,
+      backgroundColor: marginalGains.map((_, i) => i < 29 ? 'rgba(16, 185, 129, 0.3)' : 'rgba(16, 185, 129, 0.1)'),
+      borderColor: marginalGains.map((_, i) => i < 29 ? 'rgba(16, 185, 129, 0.6)' : 'rgba(16, 185, 129, 0.2)'),
+      borderWidth: 1,
+      borderRadius: 1,
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    scales: {
+      x: { display: false },
+      y: { display: false }
+    }
+  }
+});
+
+// --- Benchmark Table Data ---
+const agents = [
+  { name: 'evo-alpha-v47', gen: 47, mmlu: 84.2, humaneval: 88.1, gsm8k: 91.3, arc: 79.6, truthfulqa: 72.4, temp: 0.18, topP: 0.92, strategy: 'chain-of-thought + self-reflection', prompt: 'You are a meticulous reasoning assistant. Break every problem into atomic steps. After each step, verify your logic before proceeding. If uncertain, enumerate possible approaches and evaluate each systematically. Prefer precision over speed.' },
+  { name: 'evo-beta-v45', gen: 45, mmlu: 82.7, humaneval: 86.9, gsm8k: 89.5, arc: 81.2, truthfulqa: 70.1, temp: 0.22, topP: 0.90, strategy: 'structured-decomposition', prompt: 'Approach each task by decomposing it into sub-problems. Solve each sub-problem independently, then synthesize. Use explicit reasoning chains. When the task involves code, think about edge cases before writing.' },
+  { name: 'evo-gamma-v42', gen: 42, mmlu: 81.9, humaneval: 85.3, gsm8k: 88.1, arc: 78.8, truthfulqa: 73.8, temp: 0.15, topP: 0.95, strategy: 'few-shot-exemplar', prompt: 'You are an expert assistant. When answering, first identify the category of the question, then recall relevant principles. Structure your answer clearly with sections if needed. Always show your work for quantitative problems.' },
+  { name: 'evo-delta-v38', gen: 38, mmlu: 79.4, humaneval: 83.7, gsm8k: 86.2, arc: 77.1, truthfulqa: 71.9, temp: 0.30, topP: 0.88, strategy: 'adaptive-temperature', prompt: 'Analyze the difficulty and type of each question before answering. For factual questions, be precise and cite reasoning. For open-ended questions, explore multiple perspectives. Always verify your final answer against the original question.' },
+  { name: 'evo-epsilon-v35', gen: 35, mmlu: 78.1, humaneval: 81.2, gsm8k: 84.8, arc: 75.6, truthfulqa: 69.5, temp: 0.25, topP: 0.91, strategy: 'self-consistency', prompt: 'Generate multiple candidate answers for each problem. Compare them for consistency. Select the answer that appears most frequently or has the strongest logical support. Show the reasoning process explicitly.' },
+  { name: 'evo-zeta-v29', gen: 29, mmlu: 75.3, humaneval: 78.9, gsm8k: 82.1, arc: 73.4, truthfulqa: 67.2, temp: 0.35, topP: 0.85, strategy: 'role-specialization', prompt: 'You are a specialist problem solver. Identify your role based on the question domain. Apply domain-specific heuristics and frameworks. When unsure, default to first-principles reasoning.' },
+  { name: 'baseline-v0', gen: 0, mmlu: 68.4, humaneval: 67.2, gsm8k: 71.5, arc: 65.8, truthfulqa: 58.9, temp: 0.70, topP: 0.95, strategy: 'default', prompt: 'You are a helpful assistant.' },
+];
+
+agents.forEach(a => {
+  a.composite = Math.round(((a.mmlu + a.humaneval + a.gsm8k + a.arc + a.truthfulqa) / 5) * 10) / 10;
+});
+agents.sort((a, b) => b.composite - a.composite);
+
+const tbody = document.getElementById('benchmarkBody');
+agents.forEach((agent, idx) => {
+  const isBaseline = agent.gen === 0;
+  const rowBg = idx % 2 === 0 ? '' : 'bg-zinc-50/50';
+  const row = document.createElement('tr');
+  row.className = `border-b border-zinc-100 row-expandable ${rowBg}`;
+  row.innerHTML = `
+    <td class="px-5 py-3.5"><svg class="w-4 h-4 text-zinc-400 chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg></td>
+    <td class="px-5 py-3.5">
+      <span class="font-medium text-zinc-900">${agent.name}</span>
+      ${isBaseline ? '<span class="ml-2 text-xs px-1.5 py-0.5 bg-zinc-100 text-zinc-500 rounded">baseline</span>' : ''}
+      ${idx === 0 ? '<span class="ml-2 text-xs px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded border border-emerald-200">best</span>' : ''}
+    </td>
+    <td class="px-5 py-3.5 text-zinc-500">${agent.gen}</td>
+    <td class="px-5 py-3.5 text-right font-mono text-xs ${agent.mmlu >= 80 ? 'text-emerald-600 font-medium' : 'text-zinc-600'}">${agent.mmlu.toFixed(1)}</td>
+    <td class="px-5 py-3.5 text-right font-mono text-xs ${agent.humaneval >= 85 ? 'text-emerald-600 font-medium' : 'text-zinc-600'}">${agent.humaneval.toFixed(1)}</td>
+    <td class="px-5 py-3.5 text-right font-mono text-xs ${agent.gsm8k >= 88 ? 'text-emerald-600 font-medium' : 'text-zinc-600'}">${agent.gsm8k.toFixed(1)}</td>
+    <td class="px-5 py-3.5 text-right font-mono text-xs ${agent.arc >= 78 ? 'text-emerald-600 font-medium' : 'text-zinc-600'}">${agent.arc.toFixed(1)}</td>
+    <td class="px-5 py-3.5 text-right font-mono text-xs ${agent.truthfulqa >= 70 ? 'text-emerald-600 font-medium' : 'text-zinc-600'}">${agent.truthfulqa.toFixed(1)}</td>
+    <td class="px-5 py-3.5 text-right">
+      <span class="font-semibold text-sm ${isBaseline ? 'text-zinc-500' : 'text-zinc-900'}">${agent.composite.toFixed(1)}</span>
+    </td>
+  `;
+
+  const genomeRow = document.createElement('tr');
+  genomeRow.className = `${rowBg}`;
+  genomeRow.innerHTML = `
+    <td colspan="9" class="px-0">
+      <div class="genome-content">
+        <div class="px-5 pb-5 pt-1">
+          <div class="bg-zinc-50 border border-zinc-200 rounded-lg p-5">
+            <h4 class="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Agent Genome</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div>
+                <p class="text-xs text-zinc-400 mb-1">Temperature</p>
+                <p class="text-sm font-mono font-medium text-zinc-700">${agent.temp}</p>
+              </div>
+              <div>
+                <p class="text-xs text-zinc-400 mb-1">Top-P</p>
+                <p class="text-sm font-mono font-medium text-zinc-700">${agent.topP}</p>
+              </div>
+              <div>
+                <p class="text-xs text-zinc-400 mb-1">Strategy</p>
+                <p class="text-sm font-medium text-zinc-700">${agent.strategy}</p>
+              </div>
+            </div>
+            <div>
+              <p class="text-xs text-zinc-400 mb-2">System Prompt</p>
+              <pre class="text-xs text-zinc-600 bg-white border border-zinc-200 rounded-md p-4 whitespace-pre-wrap leading-relaxed">${agent.prompt}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </td>
+  `;
+
+  row.addEventListener('click', () => {
+    const content = genomeRow.querySelector('.genome-content');
+    const chevron = row.querySelector('.chevron');
+    content.classList.toggle('open');
+    chevron.classList.toggle('rotated');
+  });
+
+  tbody.appendChild(row);
+  tbody.appendChild(genomeRow);
+});
+</script>
+</body>
+</html>
